@@ -11,6 +11,9 @@ dependencies = []
 [project.scripts]
 claimlink = "claimlink.cli:main"
 
+[project.optional-dependencies]
+nbconvert = ["nbconvert>=7", "ipykernel>=7"]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -23,5 +26,7 @@ testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
+    "ipykernel>=7.3.0",
+    "nbconvert>=7.17.2",
     "pytest>=9.2.0",
 ]

@@ -44,3 +44,16 @@ The analysis includes \ClaimValueNumberOfAnalyzedPapers{} papers.
 ```
 
 Commit `claim-lock.json`; treat `claims.tex` as a generated artifact.
+
+## Notebooks with nbconvert
+
+JupyterLab works with no extra setup, a plain `jupyter nbconvert --execute` however does not tell the kernel which notebook or cell it is running.
+To get these fields, please use our bundled preprocessor instead of `--execute`:
+
+```bash
+pip install "claimlink[nbconvert]"
+
+jupyter nbconvert --to notebook \
+  --Exporter.preprocessors=claimlink.nbconvert.ClaimLinkPreprocessor \
+  paper.ipynb
+```

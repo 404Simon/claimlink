@@ -420,6 +420,55 @@ def test_pseudo_file_without_ipython(monkeypatch, tmp_path):
     assert messages == ["source file is not available"]
 
 
+def test_nbconvert_marker_supplies_notebook_and_cell_id(monkeypatch, tmp_path):
+    shell = FakeShell(
+        user_ns={
+            "__claimlink_cell__": {
+                "file": str(tmp_path / "experiment.ipynb"),
+                "cell_id": "cell-marker",
+            }
+        },
+        prompt_count=7,
+        filename_map={"<ipython-input-7-test>": 7},
+        parent_header={"content": {"code": "result = detect_location(root)\n"}},
+    )
+    monkeypatch.setattr(builtins, "get_ipython", lambda: shell, raising=False)
+
+    location, messages = _exec_cell("result = detect_location(root)\n", tmp_path)
+
+    assert location == {
+        "type": "notebook",
+        "file": "experiment.ipynb",
+        "cell_id": "cell-marker",
+        "execution_count": 7,
+        "line": 1,
+        "cell_source_hash": hashlib.sha256(b"result = detect_location(root)\n").hexdigest(),
+    }
+    assert messages == []
+
+
+def test_nbconvert_marker_cell_id_is_dropped_for_another_cell(monkeypatch, tmp_path):
+    shell = FakeShell(
+        user_ns={
+            "__claimlink_cell__": {
+                "file": str(tmp_path / "experiment.ipynb"),
+                "cell_id": "cell-marker",
+            }
+        },
+        prompt_count=7,
+        filename_map={"<ipython-input-7-test>": 2, "<ipython-input-7-exec>": 7},
+    )
+    monkeypatch.setattr(builtins, "get_ipython", lambda: shell, raising=False)
+
+    location, messages = _exec_cell("result = detect_location(root)\n", tmp_path)
+
+    assert location["file"] == "experiment.ipynb"
+    assert location["cell_id"] is None
+    assert location["execution_count"] is None
+    assert len(messages) == 1
+    assert "different notebook cell" in messages[0]
+
+
 def test_reports_test_file_not_package_internals():
     project_root = Path(__file__).resolve().parents[1]
     expected_line = inspect.currentframe().f_lineno + 1

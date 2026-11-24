@@ -72,8 +72,17 @@ def detect_location(project_root: Path) -> tuple[dict, list[str]]:
         if not isinstance(user_ns, dict):
             user_ns = {}
 
+        marker = user_ns.get("__claimlink_cell__")
+        if not isinstance(marker, dict):
+            marker = {}
+        marker_file = marker.get("file")
+        marker_cell_id = marker.get("cell_id")
+        if not isinstance(marker_cell_id, str) or not marker_cell_id:
+            marker_cell_id = None
+
         raw_file = (
-            user_ns.get("__session__")
+            (marker_file if isinstance(marker_file, str) and marker_file else None)
+            or user_ns.get("__session__")
             or user_ns.get("__vsc_ipynb_file__")
             or os.environ.get("JPY_SESSION_NAME")
         )
@@ -93,7 +102,8 @@ def detect_location(project_root: Path) -> tuple[dict, list[str]]:
         metadata = parent_header.get("metadata")
         cell_id = metadata.get("cellId") if isinstance(metadata, dict) else None
         if not isinstance(cell_id, str) or not cell_id:
-            cell_id = None
+            cell_id = marker_cell_id
+        if cell_id is None:
             unavailable.append("notebook cell id is not available from this frontend")
 
         execution_count = _execution_count(shell)
