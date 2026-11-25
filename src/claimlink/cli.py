@@ -25,23 +25,25 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _export(args: argparse.Namespace) -> int:
-    if not args.input.is_file():
-        reason = "is not a file" if args.input.exists() else "file not found"
-        raise ClaimLockError(f"cannot read {args.input}: {reason}")
+def _require_file(path: Path) -> None:
+    if not path.is_file():
+        reason = "is not a file" if path.exists() else "file not found"
+        raise ClaimLockError(f"cannot read {path}: {reason}")
+
+
+def _same_file(first: Path, second: Path) -> bool:
+    """Return whether both paths name the same file, even through links."""
     try:
-        same = args.output.samefile(args.input)
+        return first.samefile(second)
     except OSError:
-        same = args.output.resolve() == args.input.resolve()
-    if same:
-        raise ClaimExportError(f"refusing to overwrite input file {args.input}")
-    text = latex.generate(storage.load(args.input))
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_bytes(text.encode("utf-8"))
+        return first.resolve() == second.resolve()
+
+
+def _announce(output: Path) -> None:
     if sys.stdout is None:
-        return 0
+        return
     try:
-        print(f"Wrote {args.output}")
+        print(f"Wrote {output}")
         sys.stdout.flush()
     except OSError:
         devnull = os.open(os.devnull, os.O_WRONLY)
@@ -51,6 +53,16 @@ def _export(args: argparse.Namespace) -> int:
             os.close(devnull)
     except UnicodeEncodeError:
         pass
+
+
+def _export(args: argparse.Namespace) -> int:
+    _require_file(args.input)
+    if _same_file(args.output, args.input):
+        raise ClaimExportError(f"refusing to overwrite input file {args.input}")
+    text = latex.generate(storage.load(args.input))
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_bytes(text.encode("utf-8"))
+    _announce(args.output)
     return 0
 
 

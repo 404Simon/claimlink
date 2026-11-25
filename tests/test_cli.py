@@ -117,7 +117,7 @@ def test_export_duplicate_macro_collision(tmp_path, monkeypatch, capsys):
     assert main(["export"]) == 1
 
     err = capsys.readouterr().err
-    assert "ModelAccuracy" in err
+    assert "'model-accuracy'" in err
     assert not (tmp_path / "claims.tex").exists()
 
 
