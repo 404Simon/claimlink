@@ -48,6 +48,8 @@ The analysis includes \clv{number-of-analyzed-papers} papers.
 
 Commit `claim-lock.json`; treat `claims.tex` as a generated artifact.
 
+If your publisher does not accept `\input` or custom macros, [`docs/single-file-submission/`](docs/single-file-submission/single-file-submission.md) shows a `latexmkrc` that builds the PDF from a generated single-file copy while the source keeps the claim commands.
+
 ## Claim keys and commands
 
 Keys get derived from the claim name. Names that map to the same key abort the export.

@@ -1,0 +1,89 @@
+# Example latexmkrc: build the PDF from a generated single-file copy
+#
+# The source keeps \clv and friends; this file replaces them with
+# their values and compiles the copy, so the PDF shows what will be
+# submitted. Copy this file to your project root as `latexmkrc` and
+# adjust the three names below.
+#
+# Run `claimlink export` before building so $claims is up to date.
+
+use File::Basename qw(basename dirname);
+use File::Path qw(make_path);
+
+my $main   = 'paper.tex';             # editable source with claim commands
+my $claims = 'generated/claims.tex';  # output of `claimlink export`
+my $flat   = 'build/paper.tex';       # generated; what pdflatex reads
+
+my %value;
+my %field = (clv => 'clv', clvalue => 'clv', clunit => 'clunit', cldesc => 'cldesc');
+
+sub strip_comment {
+    my ($line) = @_;
+    my $pos = 0;
+    while (($pos = index($line, '%', $pos)) >= 0) {
+        my ($n, $i) = (0, $pos - 1);
+        while ($i >= 0 && substr($line, $i, 1) eq '\\') { $n++; $i--; }
+        return (substr($line, 0, $pos), substr($line, $pos)) if $n % 2 == 0;
+        $pos++;
+    }
+    return ($line, '');
+}
+
+sub claim_value {
+    my ($kind, $key, $src) = @_;
+    die "flatten: unknown claim key '$key' in $src\n"
+        unless exists $value{$kind}{$key};
+    return $value{$kind}{$key};
+}
+
+sub flatten_claims {
+    my ($src, $dst) = @_;
+
+    open my $cf, '<', $claims or die "flatten: $claims: $!";
+    while (<$cf>) {
+        $value{$1}{$2} = $3
+            if /^\\expandafter\\def\\csname (clv|clunit|cldesc)\@([^\\\s]+)\\endcsname\{(.*)\}\s*$/;
+    }
+    close $cf;
+
+    open my $sf, '<', $src or die "flatten: $src: $!";
+    my $tex = do { local $/; <$sf> };
+    close $sf;
+
+    my $claims_re = quotemeta($claims);
+    $tex =~ s{^[ \t]*\\input\{$claims_re\}[ \t]*\r?\n}{}m;
+
+    my @lines;
+    for my $line (split /(?<=\n)/, $tex) {
+        my ($code, $comment) = strip_comment($line);
+        $code =~ s/\\clcite\{[^}]*\}//g;
+        $code =~ s/\\(clvalue|clv|clunit|cldesc)\*?\{([^}]*)\}/
+            claim_value($field{$1}, $2, $src)
+        /ge;
+        die "flatten: unhandled claim command in $src\n"
+            if $code =~ /\\(?:clv|clvalue|clcite|clunit|cldesc|cltable|clusage)\b/;
+        die "flatten: unhandled \\input in $src; the flat file must be self-contained\n"
+            if $code =~ /\\(?:input|include)\b/;
+        push @lines, $code . $comment;
+    }
+    $tex = join '', @lines;
+
+    make_path(dirname($dst));
+    my $old = '';
+    if (open my $of, '<', $dst) { local $/; $old = <$of>; close $of; }
+    return if $tex eq $old;    # keep mtimes stable for incremental builds
+    open my $of, '>', $dst or die "flatten: $dst: $!";
+    print $of $tex;
+    close $of;
+}
+
+my $flatten = 0;
+@ARGV = map {
+    if (!/^-/ && basename($_) eq $main && $_ ne $flat) {
+        $flatten = 1;
+        $flat;
+    } else {
+        $_;
+    }
+} @ARGV;
+flatten_claims($main, $flat) if $flatten;
